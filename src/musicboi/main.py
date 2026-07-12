@@ -7,12 +7,50 @@ from PySide6.QtWidgets import (
     QLabel,
 )
 from PySide6.QtGui import QKeyEvent, QKeySequence
-from PySide6.QtCore import Qt
+
+from PySide6.QtCore import Qt, Signal
 import sys
 from urllib.parse import urlparse
+import yt_dlp
+from dataclasses import dataclass
+from typing import Any
+
+
+@dataclass
+class TrackInfo:
+    title: str
+    duration_secs: str
+    uploader: str
+    description: str
+    thumbnails: list[dict[str, Any]]
+
+
+class YoutubeBackend:
+    def __init__(self) -> None:
+        self.opts: Any = {
+            "skip_download": True,
+            "quiet": True,
+        }
+
+    def get_info(self, url: str) -> TrackInfo:
+        with yt_dlp.YoutubeDL(self.opts) as ydl:
+            info = ydl.extract_info(url)
+            return TrackInfo(
+                title=info["title"] or "N/A",
+                duration_secs=str(info["duration"]) or "N/A",
+                uploader=info["uploader"] or "N/A",
+                description=info["description"] or "N/A",
+                thumbnails=info["thumbnails"] or [],
+            )
+
+
+youtube = YoutubeBackend()
 
 
 class PlayListWidget(QListWidget):
+    total_urls = Signal(int)
+    progress = Signal(int)
+
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.supported_backends = ["www.youtube.com"]
@@ -40,7 +78,9 @@ class PlayListWidget(QListWidget):
             except ValueError:
                 pass
 
-        self.addItems(urls)
+        tracks = [youtube.get_info(url) for url in urls]
+        for track in tracks:
+            print(track)
 
 
 class PlayerWidget(QWidget):
