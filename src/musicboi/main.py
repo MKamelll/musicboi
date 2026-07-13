@@ -5,10 +5,13 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLabel,
+    QGroupBox,
+    QListWidgetItem,
+    QProgressBar,
 )
 from PySide6.QtGui import QKeyEvent, QKeySequence
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QThread
 import sys
 from urllib.parse import urlparse
 import yt_dlp
@@ -25,8 +28,12 @@ class TrackInfo:
     thumbnails: list[dict[str, Any]]
 
 
-class YoutubeBackend:
-    def __init__(self) -> None:
+class YoutubeWorker(QThread):
+    result = Signal(TrackInfo)
+
+    def __init__(self, urls: list[str]) -> None:
+        super().__init__()
+        self.urls = urls
         self.opts: Any = {
             "skip_download": True,
             "quiet": True,
@@ -43,13 +50,31 @@ class YoutubeBackend:
                 thumbnails=info["thumbnails"] or [],
             )
 
+    def run(self) -> None:
+        for i, url in enumerate(self.urls):
+            track = self.get_info(url)
+            self.result.emit(track)
 
-youtube = YoutubeBackend()
+
+class PlayListItemWidget(QWidget):
+    def __init__(self, track: TrackInfo, parent: QWidget | None) -> None:
+        super().__init__(parent)
+
+        self.vbox = QVBoxLayout(self)
+        self.title_label = QLabel(track.title)
+        self.duration_secs_label = QLabel(track.duration_secs)
+        self.uploader_label = QLabel(track.uploader)
+        self.description_label = QLabel(track.description)
+
+        self.vbox.addWidget(self.title_label)
+        self.vbox.addWidget(self.duration_secs_label)
+        self.vbox.addWidget(self.uploader_label)
+        self.vbox.addWidget(self.description_label)
 
 
 class PlayListWidget(QListWidget):
-    total_urls = Signal(int)
-    progress = Signal(int)
+    loading = Signal()
+    done = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -60,6 +85,13 @@ class PlayListWidget(QListWidget):
             self.handle_paste()
             return
         super().keyPressEvent(event)
+
+    def on_result(self, track: TrackInfo) -> None:
+        track_widget = PlayListItemWidget(track, self)
+        item_widget = QListWidgetItem(self)
+        item_widget.setSizeHint(track_widget.sizeHint())
+        self.addItem(item_widget)
+        self.setItemWidget(item_widget, track_widget)
 
     def handle_paste(self) -> None:
         clipboard = QApplication.clipboard()
@@ -78,23 +110,34 @@ class PlayListWidget(QListWidget):
             except ValueError:
                 pass
 
-        tracks = [youtube.get_info(url) for url in urls]
-        for track in tracks:
-            print(track)
+        self.worker = YoutubeWorker(urls)
+        self.worker.started.connect(self.loading)
+        self.worker.result.connect(self.on_result)
+        self.worker.finished.connect(self.done)
+        self.worker.start()
 
 
 class PlayerWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.vbox = QVBoxLayout(self)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 0)
+        self.progress_bar.hide()
+
         self.paste_label = QLabel("Copy into your clipboard, then paste here")
         self.play_list = PlayListWidget()
+        self.play_list.loading.connect(self.progress_bar.show)
+        self.play_list.done.connect(self.progress_bar.hide)
+        self.play_list.done.connect(self.progress_bar.reset)
+
         self.vbox.addWidget(
             self.paste_label,
             0,
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter,
         )
         self.vbox.addWidget(self.play_list)
+        self.vbox.addWidget(self.progress_bar)
 
 
 class MainWindow(QMainWindow):
