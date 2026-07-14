@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QListWidgetItem,
     QProgressBar,
+    QScrollArea,
 )
 from PySide6.QtGui import QKeyEvent, QKeySequence
 
@@ -61,15 +62,22 @@ class PlayListItemWidget(QWidget):
         super().__init__(parent)
 
         self.vbox = QVBoxLayout(self)
-        self.title_label = QLabel(track.title)
-        self.duration_secs_label = QLabel(track.duration_secs)
-        self.uploader_label = QLabel(track.uploader)
-        self.description_label = QLabel(track.description)
+        self.title_label = QLabel(f"Title: {track.title}")
+        self.title_label.setWordWrap(True)
+
+        d = int(track.duration_secs)
+        hours, remainder = divmod(d, 3600)
+        minutes, seconds = divmod(remainder, 60)
+
+        if hours > 0:
+            duration = f"{hours}:{minutes:02d}:{seconds:02d}"
+        else:
+            duration = f"{minutes}:{seconds:02d}"
+
+        self.duration_secs_label = QLabel(f"Duration: {duration}")
 
         self.vbox.addWidget(self.title_label)
         self.vbox.addWidget(self.duration_secs_label)
-        self.vbox.addWidget(self.uploader_label)
-        self.vbox.addWidget(self.description_label)
 
 
 class PlayListWidget(QListWidget):
@@ -131,12 +139,19 @@ class PlayerWidget(QWidget):
         self.play_list.done.connect(self.progress_bar.hide)
         self.play_list.done.connect(self.progress_bar.reset)
 
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.play_list)
+
         self.vbox.addWidget(
             self.paste_label,
             0,
             Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignCenter,
         )
-        self.vbox.addWidget(self.play_list)
+        self.vbox.addWidget(self.scroll_area)
         self.vbox.addWidget(self.progress_bar)
 
 
