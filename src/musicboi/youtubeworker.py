@@ -12,12 +12,12 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QKeyEvent, QKeySequence
 
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QRunnable, QObject
 import sys
 from urllib.parse import urlparse
 import yt_dlp
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 
 @dataclass
@@ -29,12 +29,18 @@ class TrackInfo:
     thumbnails: list[dict[str, Any]]
 
 
-class YoutubeWorker(QThread):
+class WorkerSignals(QObject):
+    started = Signal()
+    finished = Signal()
     result = Signal(TrackInfo)
 
-    def __init__(self, urls: list[str]) -> None:
+
+class YoutubeWorker(QRunnable):
+    def __init__(self, url: str) -> None:
         super().__init__()
-        self.urls = urls
+        self.setAutoDelete(True)
+        self.url = url
+        self.signals = WorkerSignals()
         self.opts: Any = {
             "skip_download": True,
             "quiet": True,
@@ -43,15 +49,17 @@ class YoutubeWorker(QThread):
     def get_info(self, url: str) -> TrackInfo:
         with yt_dlp.YoutubeDL(self.opts) as ydl:
             info = ydl.extract_info(url)
+            default_value = "N/A"
             return TrackInfo(
-                title=info["title"] or "N/A",
-                duration_secs=str(info["duration"]) or "N/A",
-                uploader=info["uploader"] or "N/A",
-                description=info["description"] or "N/A",
-                thumbnails=info["thumbnails"] or [],
+                title=info.get("title") or default_value,
+                duration_secs=str(info.get("duration")) or default_value,
+                uploader=info.get("uploader") or default_value,
+                description=info.get("description") or default_value,
+                thumbnails=info.get("thumbnails") or [],
             )
 
     def run(self) -> None:
-        for i, url in enumerate(self.urls):
-            track = self.get_info(url)
-            self.result.emit(track)
+        self.signals.started.emit()
+        track = self.get_info(self.url)
+        self.signals.result.emit(track)
+        self.signals.finished.emit()

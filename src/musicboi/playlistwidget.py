@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QKeyEvent, QKeySequence
 
-from PySide6.QtCore import Qt, Signal, QThread
+from PySide6.QtCore import Qt, Signal, QThreadPool
 import sys
 from urllib.parse import urlparse
 import yt_dlp
@@ -50,6 +50,8 @@ class PlayListWidget(QListWidget):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
+        self.pool = QThreadPool.globalInstance()
+        self.pool.setMaxThreadCount(10)
 
     def on_result(self, track: TrackInfo) -> None:
         track_widget = PlayListItemWidget(track, self)
@@ -59,8 +61,9 @@ class PlayListWidget(QListWidget):
         self.setItemWidget(item_widget, track_widget)
 
     def on_youtube_urls(self, urls: list[str]) -> None:
-        self.worker = YoutubeWorker(urls)
-        self.worker.started.connect(self.loading)
-        self.worker.result.connect(self.on_result)
-        self.worker.finished.connect(self.done)
-        self.worker.start()
+        for url in urls:
+            self.runnable = YoutubeWorker(url)
+            self.runnable.signals.started.connect(self.loading)
+            self.runnable.signals.result.connect(self.on_result)
+            self.runnable.signals.finished.connect(self.done)
+            self.pool.start(self.runnable)

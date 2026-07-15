@@ -34,7 +34,6 @@ class PlayerWidget(QWidget):
         self.play_list = PlayListWidget()
         self.play_list.loading.connect(self.progress_bar.show)
         self.play_list.done.connect(self.progress_bar.hide)
-        self.play_list.done.connect(self.progress_bar.reset)
 
         self.scroll_area = QScrollArea()
         self.scroll_area.setHorizontalScrollBarPolicy(
