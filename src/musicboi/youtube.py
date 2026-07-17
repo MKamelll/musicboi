@@ -10,6 +10,7 @@ class TrackInfo:
     uploader: str
     description: str
     thumbnails: list[dict[str, Any]]
+    audio_url: str | None
 
 
 class YoutubeDl:
@@ -17,18 +18,27 @@ class YoutubeDl:
         self.opts: Any = {
             "skip_download": True,
             "quiet": True,
+            "format": "bestaudio/best",
+            "noplaylist": True,
         }
 
     def get_info(self, url: str) -> TrackInfo:
         with yt_dlp.YoutubeDL(self.opts) as ydl:
             info = ydl.extract_info(url)
             default_value = "N/A"
+            if rf := info.get("requested_formats"):
+                rf = list(rf)
+                if len(rf) > 0:
+                    audio_url = rf[0].get("url")
+            else:
+                audio_url = info.get("url")
             return TrackInfo(
                 title=info.get("title") or default_value,
                 duration_secs=str(info.get("duration")) or default_value,
                 uploader=info.get("uploader") or default_value,
                 description=info.get("description") or default_value,
                 thumbnails=info.get("thumbnails") or [],
+                audio_url=audio_url,
             )
 
 
