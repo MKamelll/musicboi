@@ -13,11 +13,17 @@ class ControlsWidget(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.hbox = QHBoxLayout(self)
+
         self.backwards_btn = QPushButton("back")
+        self.backwards_btn.pressed.connect(self.backward)
+
         self.play_toggle = QPushButton("play")
         self.play_toggle.setCheckable(True)
         self.play_toggle.toggled.connect(self.on_play_toggle)
+
         self.forwards_btn = QPushButton("forward")
+        self.forwards_btn.pressed.connect(self.forward)
+
         self.hbox.addWidget(self.backwards_btn)
         self.hbox.addWidget(self.play_toggle)
         self.hbox.addWidget(self.forwards_btn)

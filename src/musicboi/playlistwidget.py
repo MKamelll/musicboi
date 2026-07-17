@@ -24,12 +24,13 @@ from youtubeworker import YoutubeWorker, TrackInfo
 class PlayListItemWidget(QWidget):
     def __init__(self, track: TrackInfo, parent: QWidget | None) -> None:
         super().__init__(parent)
+        self.track = track
 
         self.vbox = QVBoxLayout(self)
-        self.title_label = QLabel(f"Title: {track.title}")
+        self.title_label = QLabel(f"Title: {self.track.title}")
         self.title_label.setWordWrap(True)
 
-        d = int(track.duration_secs)
+        d = int(self.track.duration_secs)
         hours, remainder = divmod(d, 3600)
         minutes, seconds = divmod(remainder, 60)
 
